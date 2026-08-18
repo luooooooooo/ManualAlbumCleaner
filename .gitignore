@@ -8,12 +8,10 @@ local.properties
 *.hprof
 
 # Gradle files
-.gradle
+.gradle/
 .gradle/**
 build/
 **/build/
-gradlew
-gradlew.bat
 
 # IDE
 .idea/
