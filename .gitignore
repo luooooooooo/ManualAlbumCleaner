@@ -1,0 +1,66 @@
+# Local configuration file (sdk path, etc)
+local.properties
+# JDK config
+*.properties.local
+
+# Logs
+*.log
+*.hprof
+
+# Gradle files
+.gradle
+.gradle/**
+build/
+**/build/
+gradlew
+gradlew.bat
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+
+# Local environment
+.DS_Store
+Thumbs.db
+
+# Generated files
+*/generated/
+*/build/generated/
+
+# File-based keystores
+*.jks
+*.keystore
+.keystore
+
+# Local native libraries
+jniLibs/
+*/jniLibs/
+
+# ABI
+*.apk
+*.ap_
+*.aab
+
+# Android build outputs
+*.dex
+*.aar
+
+# Maven local
+maven/
+
+# Crashlytics
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+
+# Google services
+google-services.json
+
+# API Keys and Secrets
+secrets.properties

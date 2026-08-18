@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">手动相册清理</string>
+    <string name="select_album">选择相册</string>
+    <string name="trash">回收站</string>
+    <string name="no_photos">没有照片</string>
+    <string name="swipe_left_keep">← 左滑保留</string>
+    <string name="swipe_right_delete">右滑删除 →</string>
+    <string name="all_done">全部处理完毕</string>
+    <string name="all_done_subtitle">所有照片已整理完成</string>
+    <string name="empty_trash">清空回收站</string>
+    <string name="delete_permanently">彻底删除</string>
+    <string name="restore">恢复</string>
+    <string name="photo_count">%1$d 张照片</string>
+    <string name="list_view">列表</string>
+    <string name="grid_view">网格</string>
+    <string name="keep">保留站</string>
+    <string name="clear_keep">清空保留站</string>
+    <string name="select">选择</string>
+    <string name="select_all">全选</string>
+    <string name="tap_to_select">点击照片进行选择</string>
+    <string name="delete_selected">删除选中</string>
+    <string name="restore_selected">恢复选中</string>
+    <string name="selected_count">已选择 %1$d 张</string>
+</resources>
