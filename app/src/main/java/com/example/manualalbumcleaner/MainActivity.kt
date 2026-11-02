@@ -115,8 +115,9 @@ class MainActivity : AppCompatActivity() {
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.BUCKET_ID,
             MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
-            MediaStore.Images.Media.DATA
-        )
+            MediaStore.Images.Media.DATA,
+            volumeColumnName()
+        ).filterNotNull().toTypedArray()
 
         contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -128,15 +129,14 @@ class MainActivity : AppCompatActivity() {
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val bucketIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
             val bucketNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+            val volumeColumn = cursor.getColumnIndex(volumeColumnName() ?: "")
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val bucketId = cursor.getString(bucketIdColumn)
                 val bucketName = cursor.getString(bucketNameColumn) ?: "未知相册"
-                val uri = Uri.withAppendedPath(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    id.toString()
-                )
+                val volume = if (volumeColumn >= 0) cursor.getString(volumeColumn) else null
+                val uri = imageUriOf(id, volume)
 
                 val album = albums.getOrPut(bucketId) {
                     AlbumInfo(bucketId, bucketName, uri, 0)

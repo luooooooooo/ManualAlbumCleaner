@@ -3,10 +3,10 @@ package com.example.manualalbumcleaner
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
@@ -30,14 +30,33 @@ class TrashActivity : AppCompatActivity() {
     private lateinit var btnDeleteSelected: MaterialButton
     private lateinit var trashManager: TrashManager
     private lateinit var adapter: SelectablePhotoAdapter
-    
+
     private var isSelectionMode = false
     private val selectedIds = mutableSetOf<Long>()
-    private var pendingDeletePhotos: List<PhotoItem>? = null
+
+    /** 待发送的删除请求队列：系统一次只弹一个删除确认框，多批时串行发送 */
+    private val pendingBatches = mutableListOf<List<PhotoItem>>()
+    private var currentBatch: List<PhotoItem>? = null
+    private var deletedCount = 0
+    private var isDeleting = false
 
     companion object {
+        private const val TAG = "TrashActivity"
         private const val REQUEST_DELETE_PERMISSION = 2001
         private const val REQUEST_WRITE_PERMISSION = 2002
+
+        /**
+         * 单次删除请求最多携带的照片数量。Uri 会随 ClipData 跨进程传输，
+         * 数量过多会超过 Binder 事务上限（约 1MB）而失败。
+         */
+        private const val DELETE_BATCH_SIZE = 200
+    }
+
+    /** 单张照片在 MediaStore 中的状态 */
+    private sealed class MediaState {
+        data class Alive(val photo: PhotoItem) : MediaState()
+        object Gone : MediaState()
+        object Inaccessible : MediaState()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,22 +104,28 @@ class TrashActivity : AppCompatActivity() {
     }
 
     private fun toggleSelectionMode() {
-        isSelectionMode = !isSelectionMode
-        
         if (isSelectionMode) {
-            btnSelect.text = getString(R.string.select)
-            btnSelectAll.visibility = View.VISIBLE
-            tvSelectionInfo.visibility = View.VISIBLE
-            selectionActions.visibility = View.VISIBLE
-            selectedIds.clear()
+            exitSelectionMode()
         } else {
-            btnSelect.text = getString(R.string.select)
-            btnSelectAll.visibility = View.GONE
-            tvSelectionInfo.visibility = View.GONE
-            selectionActions.visibility = View.GONE
-            selectedIds.clear()
+            enterSelectionMode()
         }
-        
+    }
+
+    private fun enterSelectionMode() {
+        isSelectionMode = true
+        btnSelectAll.visibility = View.VISIBLE
+        tvSelectionInfo.visibility = View.VISIBLE
+        selectionActions.visibility = View.VISIBLE
+        selectedIds.clear()
+        loadTrash()
+    }
+
+    private fun exitSelectionMode() {
+        isSelectionMode = false
+        btnSelectAll.visibility = View.GONE
+        tvSelectionInfo.visibility = View.GONE
+        selectionActions.visibility = View.GONE
+        selectedIds.clear()
         loadTrash()
     }
 
@@ -129,106 +154,268 @@ class TrashActivity : AppCompatActivity() {
             return
         }
 
-        val allPhotos = trashManager.getTrashList()
-        for (photo in allPhotos) {
+        var restored = 0
+        for (photo in trashManager.getTrashList()) {
             if (selectedIds.contains(photo.id)) {
                 trashManager.removeFromTrash(photo)
+                restored++
             }
         }
 
-        Toast.makeText(this, "已恢复 ${selectedIds.size} 张照片", Toast.LENGTH_SHORT).show()
-        selectedIds.clear()
-        toggleSelectionMode()
-        loadTrash()
+        Toast.makeText(this, "已恢复 $restored 张照片", Toast.LENGTH_SHORT).show()
+        exitSelectionMode()
     }
 
+    // region 彻底删除
+
     private fun deleteSelected() {
+        if (isDeleting) return
         if (selectedIds.isEmpty()) {
             Toast.makeText(this, "请先选择照片", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val allPhotos = trashManager.getTrashList()
-        val photosToDelete = allPhotos.filter { selectedIds.contains(it.id) }
+        val photosToDelete = trashManager.getTrashList().filter { selectedIds.contains(it.id) }
+        if (photosToDelete.isEmpty()) {
+            Toast.makeText(this, "所选照片已不在回收站", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        if (photosToDelete.isEmpty()) return
-        pendingDeletePhotos = photosToDelete
+        isDeleting = true
+        btnDeleteSelected.isEnabled = false
+        Toast.makeText(this, "正在检查 ${photosToDelete.size} 张照片…", Toast.LENGTH_SHORT).show()
+
+        // 删除前逐张校验：MediaStore 中已不存在的记录（例如在系统相册或其他清理工具里
+        // 被删掉、被云同步移走）如果一起塞进 createDeleteRequest，系统会整批抛
+        // IllegalArgumentException，导致"删除请求失败"。
+        Thread {
+            val alive = mutableListOf<PhotoItem>()
+            val gone = mutableListOf<PhotoItem>()
+            var inaccessible = 0
+
+            for (photo in photosToDelete) {
+                when (val state = resolveMediaState(photo)) {
+                    is MediaState.Alive -> alive.add(state.photo)
+                    MediaState.Gone -> gone.add(photo)
+                    MediaState.Inaccessible -> inaccessible++
+                }
+            }
+
+            runOnUiThread {
+                btnDeleteSelected.isEnabled = true
+
+                if (gone.isNotEmpty()) {
+                    for (photo in gone) {
+                        trashManager.removeFromTrash(photo)
+                    }
+                    Toast.makeText(
+                        this,
+                        "${gone.size} 张照片已不在设备中，已从回收站移除",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                if (inaccessible > 0) {
+                    Toast.makeText(
+                        this,
+                        "有 $inaccessible 张照片暂时无法读取，已保留在回收站，未参与删除",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+
+                if (alive.isEmpty()) {
+                    isDeleting = false
+                    loadTrash()
+                    return@runOnUiThread
+                }
+                startDeleteRequests(alive)
+            }
+        }.start()
+    }
+
+    /**
+     * 查询照片在 MediaStore 中的真实状态，并用查询到的真实 volume 重建 Uri。
+     *
+     * 回收站里保存的 Uri 是 content://media/external/images/media/<id>，其中 external 是
+     * 聚合卷，_ID 在内部存储和 SD 卡之间会重复；直接拿它去删除可能命中错误条目或被系统拒绝，
+     * 因此这里以查询结果为准确认 id 与 volume。
+     */
+    private fun resolveMediaState(photo: PhotoItem): MediaState {
+        // 优先连同 volume 一起查询，以便修正旧记录里使用聚合卷的 Uri；
+        // 若该查询方式不被设备支持，再退回只查 _ID 的查询。
+        queryMediaState(photo, withVolume = true)?.let { return it }
+        queryMediaState(photo, withVolume = false)?.let { return it }
+        return MediaState.Inaccessible
+    }
+
+    /**
+     * 查询单张照片在 MediaStore 中的状态。返回 null 表示这种方式查不了，需要换一种方式重试。
+     */
+    private fun queryMediaState(photo: PhotoItem, withVolume: Boolean): MediaState? {
+        val useVolumeColumn = withVolume && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        val projection = if (useVolumeColumn) {
+            arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.VOLUME_NAME)
+        } else {
+            arrayOf(MediaStore.MediaColumns._ID)
+        }
+
+        return try {
+            val cursor = contentResolver.query(photo.uri, projection, null, null, null)
+            if (cursor == null) {
+                return MediaState.Gone
+            }
+            cursor.use { it ->
+                if (!it.moveToFirst()) {
+                    return MediaState.Gone
+                }
+                val realId = it.getLong(0)
+                val volume = if (useVolumeColumn && it.columnCount > 1) it.getString(1) else null
+                // 查不到真实 volume 时沿用原 Uri，交给系统去解析
+                val realUri = if (volume.isNullOrEmpty()) photo.uri else imageUriOf(realId, volume)
+                MediaState.Alive(photo.copy(id = realId, uri = realUri))
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "无权访问 ${photo.uri}", e)
+            MediaState.Inaccessible
+        } catch (e: IllegalArgumentException) {
+            Log.w(TAG, "查询方式不受支持 ${photo.uri}: ${e.message}")
+            null
+        } catch (e: Exception) {
+            // 查询失败时无法判断照片真实状态，保守起见既不清理记录也不参与删除
+            Log.w(TAG, "解析照片失败 ${photo.uri}", e)
+            null
+        }
+    }
+
+    /** 按 volume 分组，再按批大小切分，逐个发送系统删除请求 */
+    private fun startDeleteRequests(photos: List<PhotoItem>) {
+        deletedCount = 0
+        pendingBatches.clear()
+
+        photos.groupBy { it.uri.pathSegments.firstOrNull().orEmpty() }
+            .values
+            .forEach { group -> pendingBatches.addAll(group.chunked(DELETE_BATCH_SIZE)) }
+
+        processNextBatch()
+    }
+
+    private fun processNextBatch() {
+        if (pendingBatches.isEmpty()) {
+            finishDeleting()
+            return
+        }
+
+        val batch = pendingBatches.removeAt(0)
+        currentBatch = batch
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+: 使用系统删除请求对话框
-            val uris = photosToDelete.map { it.uri }
             try {
-                val pendingIntent = MediaStore.createDeleteRequest(contentResolver, uris)
+                val pendingIntent = MediaStore.createDeleteRequest(contentResolver, batch.map { it.uri })
                 startIntentSenderForResult(
                     pendingIntent.intentSender,
                     REQUEST_DELETE_PERMISSION,
                     null, 0, 0, 0
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(this, "删除请求失败", Toast.LENGTH_SHORT).show()
-                pendingDeletePhotos = null
+                Log.e(TAG, "createDeleteRequest 失败，共 ${batch.size} 张", e)
+                // 把系统给出的真实原因暴露给用户，避免只有一句"删除请求失败"；
+                // 失败后不再继续后续批次，避免连续弹出多个系统对话框。
+                val reason = e.message ?: e.javaClass.simpleName
+                currentBatch = null
+                pendingBatches.clear()
+                finishDeleting(notifyDeleted = false)
+                val message = if (deletedCount > 0) {
+                    "删除请求失败：$reason（已删除 $deletedCount 张）"
+                } else {
+                    "删除请求失败：$reason"
+                }
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
         } else {
-            // Android 10 及以下: 检查写入权限
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    ActivityCompat.requestPermissions(
-                        this,
-                        arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                        REQUEST_WRITE_PERMISSION
-                    )
-                    return
-                }
+            // Android 10 及以下：检查写入权限后直接删除
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                    REQUEST_WRITE_PERMISSION
+                )
+                return
             }
-            performDelete(photosToDelete)
+            deleteDirectly(batch)
         }
     }
 
-    private fun performDelete(photos: List<PhotoItem>) {
-        var deletedCount = 0
+    /** Android 10 及以下的直接删除 */
+    private fun deleteDirectly(photos: List<PhotoItem>) {
+        var failed = 0
         for (photo in photos) {
-            if (deletePhotoFile(photo.uri)) {
+            try {
+                contentResolver.delete(photo.uri, null, null)
                 trashManager.removeFromTrash(photo)
                 deletedCount++
+            } catch (e: Exception) {
+                Log.e(TAG, "直接删除失败 ${photo.uri}", e)
+                failed++
             }
         }
 
-        Toast.makeText(this, "已彻底删除 $deletedCount 张照片", Toast.LENGTH_SHORT).show()
-        selectedIds.clear()
-        pendingDeletePhotos = null
-        toggleSelectionMode()
-        loadTrash()
+        currentBatch = null
+        if (failed > 0) {
+            Toast.makeText(this, "有 $failed 张照片删除失败", Toast.LENGTH_SHORT).show()
+        }
+        processNextBatch()
     }
 
-    private fun deletePhotoFile(uri: Uri): Boolean {
-        return try {
-            contentResolver.delete(uri, null, null)
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
+    private fun finishDeleting(notifyDeleted: Boolean = true) {
+        if (notifyDeleted && deletedCount > 0) {
+            Toast.makeText(this, "已彻底删除 $deletedCount 张照片", Toast.LENGTH_SHORT).show()
+        }
+        isDeleting = false
+        btnDeleteSelected.isEnabled = true
+        currentBatch = null
+        pendingBatches.clear()
+        if (isSelectionMode) {
+            exitSelectionMode()
+        } else {
+            loadTrash()
         }
     }
+
+    // endregion
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_DELETE_PERMISSION && resultCode == RESULT_OK) {
-            pendingDeletePhotos?.let { photos ->
-                // 用户已确认系统删除请求，从回收站移除记录
-                for (photo in photos) {
-                    trashManager.removeFromTrash(photo)
-                }
-                Toast.makeText(this, "已彻底删除 ${photos.size} 张照片", Toast.LENGTH_SHORT).show()
-                selectedIds.clear()
-                pendingDeletePhotos = null
-                toggleSelectionMode()
-                loadTrash()
+        if (requestCode != REQUEST_DELETE_PERMISSION) return
+
+        val batch = currentBatch
+        if (batch == null) {
+            // 进程被系统回收后恢复等场景，没有待处理的批次，直接收尾
+            finishDeleting()
+            return
+        }
+
+        if (resultCode == RESULT_OK) {
+            // 用户已确认，系统已完成删除
+            for (photo in batch) {
+                trashManager.removeFromTrash(photo)
             }
+            deletedCount += batch.size
+            currentBatch = null
+            processNextBatch()
+        } else {
+            val remaining = batch.size + pendingBatches.sumOf { it.size }
+            currentBatch = null
+            pendingBatches.clear()
+            finishDeleting(notifyDeleted = false)
+            val message = if (deletedCount > 0) {
+                "已取消，已删除 $deletedCount 张，其余 $remaining 张仍保留在回收站"
+            } else {
+                "已取消删除，照片仍保留在回收站"
+            }
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -238,11 +425,16 @@ class TrashActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_WRITE_PERMISSION && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            pendingDeletePhotos?.let { performDelete(it) }
-        } else if (requestCode == REQUEST_WRITE_PERMISSION) {
+        if (requestCode != REQUEST_WRITE_PERMISSION) return
+
+        val granted = grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            currentBatch?.let { deleteDirectly(it) }
+        } else {
             Toast.makeText(this, "需要存储写入权限才能删除照片", Toast.LENGTH_SHORT).show()
-            pendingDeletePhotos = null
+            currentBatch = null
+            processNextBatch()
         }
     }
 }

@@ -3,7 +3,6 @@ package com.example.manualalbumcleaner
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ObjectAnimator
-import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.MotionEvent
@@ -82,8 +81,9 @@ class PhotoSwipeActivity : AppCompatActivity() {
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.BUCKET_ID,
-            MediaStore.Images.Media.BUCKET_DISPLAY_NAME
-        )
+            MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
+            volumeColumnName()
+        ).filterNotNull().toTypedArray()
         val selection = "${MediaStore.Images.Media.BUCKET_ID} = ?"
         val selectionArgs = arrayOf(bucketId)
 
@@ -98,16 +98,15 @@ class PhotoSwipeActivity : AppCompatActivity() {
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val bucketIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
             val bucketNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+            val volumeColumn = cursor.getColumnIndex(volumeColumnName() ?: "")
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn) ?: ""
                 val bId = cursor.getString(bucketIdColumn) ?: ""
                 val bName = cursor.getString(bucketNameColumn) ?: ""
-                val uri = Uri.withAppendedPath(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    id.toString()
-                )
+                val volume = if (volumeColumn >= 0) cursor.getString(volumeColumn) else null
+                val uri = imageUriOf(id, volume)
                 // Skip photos already in keep or trash
                 if (!keepManager.isKept(id) && !trashManager.isInTrash(id)) {
                     photos.add(PhotoItem(id, uri, name, bId, bName))
