@@ -24,12 +24,13 @@ import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+import com.example.manualalbumcleaner.widget.PinchGridRecyclerView
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBar: AppBarLayout
     private lateinit var toolbar: MaterialToolbar
-    private lateinit var recyclerAlbums: RecyclerView
+    private lateinit var recyclerAlbums: PinchGridRecyclerView
     private lateinit var emptyState: LinearLayout
     private lateinit var btnTrash: ExtendedFloatingActionButton
     private lateinit var btnLayoutToggle: MaterialButton
@@ -38,6 +39,9 @@ class MainActivity : AppCompatActivity() {
 
     private var albumList: List<AlbumInfo> = emptyList()
     private var isGridView = true
+    private var gridColumns = DEFAULT_COLUMNS
+
+    private val uiPrefs by lazy { getSharedPreferences("ui_prefs", MODE_PRIVATE) }
 
     private val REQUEST_PERMISSION = 1001
 
@@ -54,8 +58,18 @@ class MainActivity : AppCompatActivity() {
         btnLayoutToggle = findViewById(R.id.btnLayoutToggle)
         trashManager = TrashManager(this)
 
-        recyclerAlbums.layoutManager = GridLayoutManager(this, 2)
-        adapter = AlbumAdapter(emptyList(), isGridView) { album ->
+        gridColumns = uiPrefs.getInt(KEY_GRID_COLUMNS, DEFAULT_COLUMNS)
+            .coerceIn(DEFAULT_COLUMNS, MAX_COLUMNS)
+
+        recyclerAlbums.layoutManager = GridLayoutManager(this, gridColumns)
+        recyclerAlbums.setColumns(gridColumns)
+        recyclerAlbums.onColumnsChanged = { count ->
+            gridColumns = count
+            uiPrefs.edit().putInt(KEY_GRID_COLUMNS, count).apply()
+            adapter.setColumns(count)
+        }
+
+        adapter = AlbumAdapter(emptyList(), isGridView, gridColumns) { album ->
             val intent = Intent(this, PhotoSwipeActivity::class.java)
             intent.putExtra("bucketId", album.bucketId)
             intent.putExtra("bucketName", album.bucketName)
@@ -87,7 +101,8 @@ class MainActivity : AppCompatActivity() {
     private fun toggleLayout() {
         isGridView = !isGridView
         if (isGridView) {
-            recyclerAlbums.layoutManager = GridLayoutManager(this, 2)
+            recyclerAlbums.layoutManager = GridLayoutManager(this, gridColumns)
+            recyclerAlbums.setColumns(gridColumns)
             btnLayoutToggle.setIconResource(R.drawable.ic_list)
             btnLayoutToggle.contentDescription = getString(R.string.grid_view)
         } else {
@@ -209,4 +224,11 @@ class MainActivity : AppCompatActivity() {
         val coverUri: Uri,
         var count: Int
     )
+
+    private companion object {
+        /** 默认两列，双指捏合可放大到 4~5 列 */
+        const val DEFAULT_COLUMNS = 2
+        const val MAX_COLUMNS = 5
+        const val KEY_GRID_COLUMNS = "grid_columns"
+    }
 }
