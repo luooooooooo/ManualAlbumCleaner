@@ -4,12 +4,13 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 
 class SelectablePhotoAdapter(
     private var photos: List<PhotoItem>,
-    private val isSelectionMode: Boolean = false,
+    private var isSelectionMode: Boolean = false,
     private val selectedIds: MutableSet<Long> = mutableSetOf(),
     private val onSelectionChange: ((Int) -> Unit)? = null
 ) : RecyclerView.Adapter<SelectablePhotoAdapter.ViewHolder>() {
@@ -28,46 +29,41 @@ class SelectablePhotoAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val photo = photos[position]
-        
-        Glide.with(holder.itemView.context)
+
+        Glide.with(holder.imgPhoto)
             .load(photo.uri)
-            .placeholder(android.R.drawable.ic_menu_gallery)
+            .placeholder(R.drawable.bg_photo_placeholder)
+            .centerCrop()
             .into(holder.imgPhoto)
 
-        if (isSelectionMode) {
-            holder.checkbox.visibility = View.VISIBLE
-            holder.selectionOverlay.visibility = View.VISIBLE
-            
-            if (selectedIds.contains(photo.id)) {
-                holder.checkbox.setImageResource(R.drawable.ic_checkbox_checked)
-                holder.selectionOverlay.alpha = 0.3f
-            } else {
-                holder.checkbox.setImageResource(R.drawable.ic_checkbox_unchecked)
-                holder.selectionOverlay.alpha = 0f
-            }
-        } else {
-            holder.checkbox.visibility = View.GONE
-            holder.selectionOverlay.visibility = View.GONE
-        }
+        val selected = selectedIds.contains(photo.id)
+        holder.checkbox.isVisible = isSelectionMode
+        holder.selectionOverlay.isVisible = isSelectionMode && selected
+        holder.checkbox.setImageResource(
+            if (selected) R.drawable.ic_check_circle else R.drawable.ic_check_circle_outline
+        )
 
         holder.itemView.setOnClickListener {
-            if (isSelectionMode) {
-                if (selectedIds.contains(photo.id)) {
-                    selectedIds.remove(photo.id)
-                } else {
-                    selectedIds.add(photo.id)
-                }
-                notifyItemChanged(position)
-                onSelectionChange?.invoke(selectedIds.size)
+            if (!isSelectionMode) return@setOnClickListener
+            if (selectedIds.contains(photo.id)) {
+                selectedIds.remove(photo.id)
+            } else {
+                selectedIds.add(photo.id)
             }
+            notifyItemChanged(position)
+            onSelectionChange?.invoke(selectedIds.size)
         }
     }
 
     override fun getItemCount() = photos.size
 
-    fun updatePhotos(newPhotos: List<PhotoItem>) {
+    fun setPhotos(newPhotos: List<PhotoItem>) {
         photos = newPhotos
-        selectedIds.clear()
+        notifyDataSetChanged()
+    }
+
+    fun setSelectionMode(enabled: Boolean) {
+        isSelectionMode = enabled
         notifyDataSetChanged()
     }
 

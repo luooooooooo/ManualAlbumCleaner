@@ -9,10 +9,12 @@
         android:maxSdkVersion="29" />
 
     <application
+        android:name=".App"
         android:allowBackup="true"
-        android:icon="@android:drawable/ic_menu_gallery"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:requestLegacyExternalStorage="true"
+        android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.ManualAlbumCleaner"
         tools:targetApi="31">
@@ -26,9 +28,8 @@
         </activity>
         <activity
             android:name=".PhotoSwipeActivity"
-            android:theme="@style/Theme.ManualAlbumCleaner.PhotoSwipe" />
+            android:theme="@style/Theme.ManualAlbumCleaner.Viewer" />
         <activity android:name=".TrashActivity" />
-        <activity android:name=".KeepActivity" />
     </application>
 
 </manifest>

@@ -8,23 +8,30 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import android.view.View
-import android.widget.TextView
+import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 
 class TrashActivity : AppCompatActivity() {
 
+    private lateinit var appBar: AppBarLayout
     private lateinit var toolbar: MaterialToolbar
     private lateinit var btnSelect: MaterialButton
     private lateinit var btnSelectAll: MaterialButton
-    private lateinit var tvSelectionInfo: TextView
     private lateinit var recyclerTrash: RecyclerView
+    private lateinit var emptyState: LinearLayout
     private lateinit var selectionActions: View
     private lateinit var btnRestoreSelected: MaterialButton
     private lateinit var btnDeleteSelected: MaterialButton
@@ -60,14 +67,16 @@ class TrashActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_trash)
 
+        appBar = findViewById(R.id.appBar)
         toolbar = findViewById(R.id.toolbar)
         btnSelect = findViewById(R.id.btnSelect)
         btnSelectAll = findViewById(R.id.btnSelectAll)
-        tvSelectionInfo = findViewById(R.id.tvSelectionInfo)
         recyclerTrash = findViewById(R.id.recyclerTrash)
+        emptyState = findViewById(R.id.emptyState)
         selectionActions = findViewById(R.id.selectionActions)
         btnRestoreSelected = findViewById(R.id.btnRestoreSelected)
         btnDeleteSelected = findViewById(R.id.btnDeleteSelected)
@@ -86,7 +95,19 @@ class TrashActivity : AppCompatActivity() {
         btnRestoreSelected.setOnClickListener { restoreSelected() }
         btnDeleteSelected.setOnClickListener { deleteSelected() }
 
+        applyWindowInsets()
         loadTrash()
+    }
+
+    private fun applyWindowInsets() {
+        val baseRecyclerBottom = recyclerTrash.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.rootLayout)) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            appBar.updatePadding(top = bars.top)
+            recyclerTrash.updatePadding(bottom = baseRecyclerBottom + bars.bottom + 88)
+            selectionActions.translationY = -bars.bottom.toFloat()
+            insets
+        }
     }
 
     override fun onResume() {
@@ -96,55 +117,61 @@ class TrashActivity : AppCompatActivity() {
 
     private fun loadTrash() {
         val list = trashManager.getTrashList()
-        adapter = SelectablePhotoAdapter(list, isSelectionMode, selectedIds) { count ->
-            updateSelectionInfo(count)
+        adapter.setPhotos(list)
+        val isEmpty = list.isEmpty()
+        emptyState.isVisible = isEmpty
+        recyclerTrash.isVisible = !isEmpty
+
+        if (isEmpty) {
+            isSelectionMode = false
+            selectedIds.clear()
+            adapter.setSelectionMode(false)
         }
-        recyclerTrash.adapter = adapter
+        applySelectionModeUi()
         updateSelectionInfo(selectedIds.size)
     }
 
+    private fun applySelectionModeUi() {
+        btnSelect.text = getString(if (isSelectionMode) R.string.cancel else R.string.select)
+        btnSelectAll.isVisible = isSelectionMode
+        selectionActions.isVisible = isSelectionMode && adapter.itemCount > 0
+    }
+
     private fun toggleSelectionMode() {
-        if (isSelectionMode) {
-            exitSelectionMode()
-        } else {
-            enterSelectionMode()
-        }
+        if (isSelectionMode) exitSelectionMode() else enterSelectionMode()
     }
 
     private fun enterSelectionMode() {
         isSelectionMode = true
-        btnSelectAll.visibility = View.VISIBLE
-        tvSelectionInfo.visibility = View.VISIBLE
-        selectionActions.visibility = View.VISIBLE
         selectedIds.clear()
-        loadTrash()
+        adapter.setSelectionMode(true)
+        applySelectionModeUi()
+        updateSelectionInfo(0)
     }
 
     private fun exitSelectionMode() {
         isSelectionMode = false
-        btnSelectAll.visibility = View.GONE
-        tvSelectionInfo.visibility = View.GONE
-        selectionActions.visibility = View.GONE
         selectedIds.clear()
-        loadTrash()
+        adapter.setSelectionMode(false)
+        applySelectionModeUi()
+        updateSelectionInfo(0)
     }
 
     private fun selectAll() {
-        val allPhotos = trashManager.getTrashList()
         selectedIds.clear()
-        for (photo in allPhotos) {
+        for (photo in trashManager.getTrashList()) {
             selectedIds.add(photo.id)
         }
-        loadTrash()
+        adapter.notifyDataSetChanged()
+        updateSelectionInfo(selectedIds.size)
     }
 
     private fun updateSelectionInfo(count: Int) {
-        if (isSelectionMode) {
-            tvSelectionInfo.text = if (count > 0) {
-                getString(R.string.selected_count, count)
-            } else {
-                getString(R.string.tap_to_select)
-            }
+        toolbar.subtitle = when {
+            isSelectionMode && count > 0 -> getString(R.string.selected_count, count)
+            isSelectionMode -> getString(R.string.tap_to_select)
+            adapter.itemCount > 0 -> getString(R.string.photo_count, adapter.itemCount)
+            else -> null
         }
     }
 
@@ -164,6 +191,7 @@ class TrashActivity : AppCompatActivity() {
 
         Toast.makeText(this, "已恢复 $restored 张照片", Toast.LENGTH_SHORT).show()
         exitSelectionMode()
+        loadTrash()
     }
 
     // region 彻底删除
@@ -379,9 +407,8 @@ class TrashActivity : AppCompatActivity() {
         pendingBatches.clear()
         if (isSelectionMode) {
             exitSelectionMode()
-        } else {
-            loadTrash()
         }
+        loadTrash()
     }
 
     // endregion

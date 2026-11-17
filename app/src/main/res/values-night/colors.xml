@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色兜底配色（Android 12 以下生效；Android 12+ 由系统壁纸动态取色覆盖） -->
+    <color name="color_primary">#B1C6FF</color>
+    <color name="color_on_primary">#00297B</color>
+    <color name="color_primary_container">#0F439F</color>
+    <color name="color_on_primary_container">#DCE3FF</color>
+
+    <color name="color_secondary">#C3C6D9</color>
+    <color name="color_on_secondary">#2C2F41</color>
+    <color name="color_secondary_container">#424659</color>
+    <color name="color_on_secondary_container">#DFE2F4</color>
+
+    <color name="color_tertiary">#DABCEC</color>
+    <color name="color_on_tertiary">#422A4F</color>
+    <color name="color_tertiary_container">#5A4066</color>
+    <color name="color_on_tertiary_container">#F6D9FF</color>
+
+    <color name="color_error">#FFB4AB</color>
+    <color name="color_on_error">#690005</color>
+    <color name="color_error_container">#93000A</color>
+    <color name="color_on_error_container">#FFDAD6</color>
+
+    <color name="color_surface">#121318</color>
+    <color name="color_on_surface">#E3E1E9</color>
+    <color name="color_surface_container_lowest">#0D0E13</color>
+    <color name="color_surface_container_low">#1A1B21</color>
+    <color name="color_surface_container">#1E1F25</color>
+    <color name="color_surface_container_high">#292A31</color>
+    <color name="color_surface_container_highest">#34353C</color>
+    <color name="color_on_surface_variant">#C7C5D0</color>
+    <color name="color_outline">#908F9A</color>
+    <color name="color_outline_variant">#46464F</color>
+    <color name="color_inverse_surface">#E3E1E9</color>
+    <color name="color_inverse_on_surface">#2F3037</color>
+
+    <color name="photo_surface">#000000</color>
+    <color name="photo_on_surface">#ECECEC</color>
+    <color name="photo_on_surface_variant">#A8A8B0</color>
+</resources>

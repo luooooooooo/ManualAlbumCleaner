@@ -1,78 +1,94 @@
 package com.example.manualalbumcleaner
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ObjectAnimator
+import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.provider.MediaStore
-import android.view.MotionEvent
 import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.animation.AccelerateInterpolator
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.cardview.widget.CardView
-import com.bumptech.glide.Glide
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
+import androidx.viewpager2.widget.ViewPager2
+import com.example.manualalbumcleaner.widget.SwipeUpToTrashLayout
+import com.google.android.material.button.MaterialButton
 import kotlin.math.abs
-import kotlin.math.min
 
+/**
+ * 相册浏览页：左右滑动由 ViewPager2 负责翻看上一张 / 下一张，
+ * 向上拖动由 [SwipeUpToTrashLayout] 接管，超过阈值即移入回收站。
+ */
 class PhotoSwipeActivity : AppCompatActivity() {
 
-    private lateinit var cardPhoto: CardView
-    private lateinit var imgPhoto: ImageView
-    private lateinit var tvHint: TextView
+    private lateinit var swipeLayout: SwipeUpToTrashLayout
+    private lateinit var pager: ViewPager2
+    private lateinit var tvAlbumName: TextView
+    private lateinit var tvPageIndicator: TextView
+    private lateinit var topBar: LinearLayout
+    private lateinit var bottomBar: LinearLayout
     private lateinit var emptyContainer: LinearLayout
-    private lateinit var trashManager: TrashManager
-    private lateinit var keepManager: KeepManager
 
-    private lateinit var keepArea: LinearLayout
-    private lateinit var deleteArea: LinearLayout
-    private lateinit var iconKeep: ImageView
-    private lateinit var labelKeep: TextView
-    private lateinit var iconDelete: ImageView
-    private lateinit var labelDelete: TextView
+    private lateinit var trashManager: TrashManager
+    private lateinit var adapter: PhotoPagerAdapter
 
     private val photos = mutableListOf<PhotoItem>()
-    private var currentIndex = 0
-    private var isAnimating = false
-
-    private var downX = 0f
-    private var downY = 0f
-    private var cardStartX = 0f
-    private var cardStartY = 0f
-
-    private val SWIPE_THRESHOLD = 200f
-    private val ROTATION_FACTOR = 20f
-    private val MAX_ALPHA_DISTANCE = 350f
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+        )
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_photo_swipe)
 
-        cardPhoto = findViewById(R.id.cardPhoto)
-        imgPhoto = findViewById(R.id.imgPhoto)
-        tvHint = findViewById(R.id.tvHint)
-        emptyContainer = findViewById(R.id.emptyContainer)
         trashManager = TrashManager(this)
-        keepManager = KeepManager(this)
 
-        keepArea = findViewById(R.id.keepArea)
-        deleteArea = findViewById(R.id.deleteArea)
-        iconKeep = findViewById(R.id.iconKeep)
-        labelKeep = findViewById(R.id.labelKeep)
-        iconDelete = findViewById(R.id.iconDelete)
-        labelDelete = findViewById(R.id.labelDelete)
+        swipeLayout = findViewById(R.id.swipeLayout)
+        pager = findViewById(R.id.pagerPhotos)
+        tvAlbumName = findViewById(R.id.tvAlbumName)
+        tvPageIndicator = findViewById(R.id.tvPageIndicator)
+        topBar = findViewById(R.id.topBar)
+        bottomBar = findViewById(R.id.bottomBar)
+        emptyContainer = findViewById(R.id.emptyContainer)
+
+        val albumName = intent.getStringExtra("bucketName").orEmpty()
+        tvAlbumName.text = albumName
+
+        findViewById<MaterialButton>(R.id.btnBack).setOnClickListener { finish() }
+        findViewById<MaterialButton>(R.id.btnBackToAlbums).setOnClickListener { finish() }
+        findViewById<MaterialButton>(R.id.btnOpenTrash).setOnClickListener {
+            startActivity(Intent(this, TrashActivity::class.java))
+        }
+
+        applyWindowInsets()
 
         val bucketId = intent.getStringExtra("bucketId") ?: return
         loadPhotos(bucketId)
 
+        setUpPager()
+        setUpSwipeGesture()
+
         if (photos.isEmpty()) {
             showEmptyState()
         } else {
-            setupTouchListener()
-            showCurrentPhoto()
+            updateIndicator()
+            animateContentIn()
+        }
+    }
+
+    private fun applyWindowInsets() {
+        val baseTop = topBar.paddingTop
+        val baseBottom = bottomBar.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(swipeLayout) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            topBar.updatePadding(top = baseTop + bars.top)
+            bottomBar.updatePadding(bottom = baseBottom + bars.bottom)
+            emptyContainer.updatePadding(top = bars.top, bottom = bars.bottom)
+            insets
         }
     }
 
@@ -97,7 +113,8 @@ class PhotoSwipeActivity : AppCompatActivity() {
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val bucketIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
-            val bucketNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+            val bucketNameColumn =
+                cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
             val volumeColumn = cursor.getColumnIndex(volumeColumnName() ?: "")
 
             while (cursor.moveToNext()) {
@@ -106,263 +123,94 @@ class PhotoSwipeActivity : AppCompatActivity() {
                 val bId = cursor.getString(bucketIdColumn) ?: ""
                 val bName = cursor.getString(bucketNameColumn) ?: ""
                 val volume = if (volumeColumn >= 0) cursor.getString(volumeColumn) else null
-                val uri = imageUriOf(id, volume)
-                // Skip photos already in keep or trash
-                if (!keepManager.isKept(id) && !trashManager.isInTrash(id)) {
-                    photos.add(PhotoItem(id, uri, name, bId, bName))
+                // 已在回收站里的照片不再出现在浏览队列中
+                if (!trashManager.isInTrash(id)) {
+                    photos.add(PhotoItem(id, imageUriOf(id, volume), name, bId, bName))
                 }
             }
         }
     }
 
-    private fun setupTouchListener() {
-        cardPhoto.setOnTouchListener { _, event ->
-            if (isAnimating) return@setOnTouchListener true
-
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    downX = event.rawX
-                    downY = event.rawY
-                    cardStartX = cardPhoto.translationX
-                    cardStartY = cardPhoto.translationY
-                    true
-                }
-
-                MotionEvent.ACTION_MOVE -> {
-                    val deltaX = event.rawX - downX
-                    val deltaY = event.rawY - downY
-
-                    cardPhoto.translationX = cardStartX + deltaX
-                    cardPhoto.translationY = cardStartY + deltaY * 0.2f
-                    cardPhoto.rotation = deltaX / ROTATION_FACTOR
-
-                    updateVisualFeedback(deltaX)
-                    true
-                }
-
-                MotionEvent.ACTION_UP -> {
-                    val deltaX = event.rawX - downX
-                    handleRelease(deltaX)
-                    true
-                }
-
-                else -> false
-            }
+    private fun setUpPager() {
+        adapter = PhotoPagerAdapter(photos)
+        pager.adapter = adapter
+        pager.offscreenPageLimit = 2
+        // 相邻页略微缩小并淡化，翻页时像画廊一样有层次
+        pager.setPageTransformer { page, position ->
+            val offset = abs(position).coerceAtMost(1f)
+            page.alpha = 1f - 0.4f * offset
+            val scale = 1f - 0.07f * offset
+            page.scaleX = scale
+            page.scaleY = scale
         }
-    }
-
-    private fun updateVisualFeedback(deltaX: Float) {
-        val absDx = abs(deltaX)
-        val progress = min(1f, absDx / MAX_ALPHA_DISTANCE)
-        val scale = 0.7f + (0.3f * progress)
-
-        if (deltaX < 0) {
-            keepArea.alpha = progress
-            keepArea.scaleX = scale
-            keepArea.scaleY = scale
-            deleteArea.alpha = 0f
-            iconKeep.alpha = 1f
-            labelKeep.alpha = 1f
-            iconDelete.alpha = 0f
-            labelDelete.alpha = 0f
-        } else {
-            deleteArea.alpha = progress
-            deleteArea.scaleX = scale
-            deleteArea.scaleY = scale
-            keepArea.alpha = 0f
-            iconKeep.alpha = 0f
-            labelKeep.alpha = 0f
-            iconDelete.alpha = 1f
-            labelDelete.alpha = 1f
-        }
-    }
-
-    private fun handleRelease(deltaX: Float) {
-        isAnimating = true
-
-        when {
-            deltaX < -SWIPE_THRESHOLD -> animateKeep()
-            deltaX > SWIPE_THRESHOLD -> animateDelete()
-            else -> animateReturn()
-        }
-    }
-
-    private fun animateReturn() {
-        val screenWidth = resources.displayMetrics.widthPixels.toFloat()
-
-        val flyBack = ObjectAnimator.ofFloat(cardPhoto, "translationX", cardPhoto.translationX, 0f)
-        flyBack.duration = 200
-        flyBack.interpolator = AccelerateDecelerateInterpolator()
-
-        val rotateBack = ObjectAnimator.ofFloat(cardPhoto, "rotation", cardPhoto.rotation, 0f)
-        rotateBack.duration = 200
-
-        val areaAlphaOut = ObjectAnimator.ofFloat(keepArea, "alpha", keepArea.alpha, 0f)
-        areaAlphaOut.duration = 150
-        val areaAlphaOut2 = ObjectAnimator.ofFloat(deleteArea, "alpha", deleteArea.alpha, 0f)
-        areaAlphaOut2.duration = 150
-
-        flyBack.addListener(object : AnimatorListenerAdapter() {
-            override fun onAnimationEnd(animation: Animator) {
-                isAnimating = false
-                cardPhoto.translationY = 0f
+        pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                updateIndicator()
             }
         })
-
-        flyBack.start()
-        rotateBack.start()
-        areaAlphaOut.start()
-        areaAlphaOut2.start()
     }
 
-    private fun animateKeep() {
-        val photo = photos[currentIndex]
-        keepManager.addToKeep(photo)
-        currentIndex++
-
-        val screenWidth = resources.displayMetrics.widthPixels.toFloat()
-        val targetX = -screenWidth * 1.2f
-
-        val flyOut = ObjectAnimator.ofFloat(cardPhoto, "translationX", cardPhoto.translationX, targetX)
-        flyOut.duration = 180
-        flyOut.interpolator = AccelerateInterpolator(1.5f)
-
-        val fadeOut = ObjectAnimator.ofFloat(cardPhoto, "alpha", 1f, 0f)
-        fadeOut.duration = 150
-
-        flyOut.addListener(object : AnimatorListenerAdapter() {
-            override fun onAnimationEnd(animation: Animator) {
-                resetVisualFeedback()
-                if (currentIndex < photos.size) {
-                    animateNextPhotoIn()
-                } else {
-                    showEmptyState()
-                    isAnimating = false
-                }
-            }
-        })
-
-        flyOut.start()
-        fadeOut.start()
+    private fun setUpSwipeGesture() {
+        swipeLayout.dragTarget = pager
+        swipeLayout.trashTarget = findViewById(R.id.trashTarget)
+        swipeLayout.dragEnabled = photos.isNotEmpty()
+        swipeLayout.onDragStart = {
+            pager.isUserInputEnabled = false
+        }
+        swipeLayout.onDragCancel = {
+            pager.isUserInputEnabled = true
+        }
+        swipeLayout.onTrashed = {
+            pager.isUserInputEnabled = true
+            trashCurrentPhoto()
+        }
     }
 
-    private fun animateDelete() {
-        val photo = photos[currentIndex]
+    private fun updateIndicator() {
+        if (photos.isEmpty()) return
+        val index = pager.currentItem.coerceIn(0, photos.lastIndex)
+        tvPageIndicator.text = getString(R.string.page_indicator, index + 1, photos.size)
+    }
+
+    /** 把当前这一张移入回收站并从浏览队列里移除 */
+    private fun trashCurrentPhoto() {
+        val index = pager.currentItem
+        if (index !in photos.indices) return
+
+        val photo = photos[index]
         trashManager.addToTrash(photo)
-        currentIndex++
+        photos.removeAt(index)
+        adapter.notifyItemRemoved(index)
 
-        val screenWidth = resources.displayMetrics.widthPixels.toFloat()
-        val targetX = screenWidth * 1.2f
-
-        val flyOut = ObjectAnimator.ofFloat(cardPhoto, "translationX", cardPhoto.translationX, targetX)
-        flyOut.duration = 180
-        flyOut.interpolator = AccelerateInterpolator(1.5f)
-
-        val fadeOut = ObjectAnimator.ofFloat(cardPhoto, "alpha", 1f, 0f)
-        fadeOut.duration = 150
-
-        flyOut.addListener(object : AnimatorListenerAdapter() {
-            override fun onAnimationEnd(animation: Animator) {
-                resetVisualFeedback()
-                if (currentIndex < photos.size) {
-                    animateNextPhotoIn()
-                } else {
-                    showEmptyState()
-                    isAnimating = false
-                }
-            }
-        })
-
-        flyOut.start()
-        fadeOut.start()
-    }
-
-    private fun animateNextPhotoIn() {
-        cardPhoto.translationX = 0f
-        cardPhoto.translationY = 300f
-        cardPhoto.scaleX = 0.9f
-        cardPhoto.scaleY = 0.9f
-        cardPhoto.alpha = 0f
-
-        showCurrentPhoto()
-
-        val flyIn = ObjectAnimator.ofFloat(cardPhoto, "translationY", 300f, 0f)
-        flyIn.duration = 200
-        flyIn.interpolator = AccelerateDecelerateInterpolator()
-
-        val scaleIn = ObjectAnimator.ofFloat(cardPhoto, "scaleX", 0.9f, 1f)
-        scaleIn.duration = 200
-        scaleIn.interpolator = AccelerateDecelerateInterpolator()
-
-        val scaleInY = ObjectAnimator.ofFloat(cardPhoto, "scaleY", 0.9f, 1f)
-        scaleInY.duration = 200
-        scaleInY.interpolator = AccelerateDecelerateInterpolator()
-
-        val alphaIn = ObjectAnimator.ofFloat(cardPhoto, "alpha", 0f, 1f)
-        alphaIn.duration = 150
-
-        flyIn.addListener(object : AnimatorListenerAdapter() {
-            override fun onAnimationEnd(animation: Animator) {
-                isAnimating = false
-            }
-        })
-
-        flyIn.start()
-        scaleIn.start()
-        scaleInY.start()
-        alphaIn.start()
-    }
-
-    private fun resetVisualFeedback() {
-        keepArea.alpha = 0f
-        deleteArea.alpha = 0f
-        iconKeep.alpha = 0f
-        labelKeep.alpha = 0f
-        iconDelete.alpha = 0f
-        labelDelete.alpha = 0f
-        cardPhoto.alpha = 1f
-        cardPhoto.scaleX = 1f
-        cardPhoto.scaleY = 1f
-        cardPhoto.translationX = 0f
-        cardPhoto.translationY = 0f
-        cardPhoto.rotation = 0f
-    }
-
-    private fun showCurrentPhoto() {
-        if (currentIndex >= photos.size) {
+        if (photos.isEmpty()) {
             showEmptyState()
             return
         }
 
-        cardPhoto.visibility = View.VISIBLE
-        tvHint.visibility = View.VISIBLE
-        emptyContainer.visibility = View.GONE
+        if (pager.currentItem >= photos.size) {
+            pager.setCurrentItem(photos.lastIndex, false)
+        }
+        updateIndicator()
+    }
 
-        val photo = photos[currentIndex]
-        Glide.with(this)
-            .load(photo.uri)
-            .placeholder(android.R.drawable.ic_menu_gallery)
-            .into(imgPhoto)
-
-        tvHint.text = getString(R.string.photo_count, photos.size - currentIndex)
+    private fun animateContentIn() {
+        pager.alpha = 0f
+        pager.animate().alpha(1f).setDuration(220).start()
     }
 
     private fun showEmptyState() {
-        cardPhoto.visibility = View.GONE
-        tvHint.visibility = View.GONE
+        swipeLayout.dragEnabled = false
+        pager.visibility = View.GONE
+        bottomBar.visibility = View.GONE
+        tvPageIndicator.visibility = View.GONE
         emptyContainer.visibility = View.VISIBLE
+
         emptyContainer.alpha = 0f
-        emptyContainer.translationY = 60f
-
-        val fadeIn = ObjectAnimator.ofFloat(emptyContainer, "alpha", 0f, 1f)
-        fadeIn.duration = 300
-
-        val slideUp = ObjectAnimator.ofFloat(emptyContainer, "translationY", 60f, 0f)
-        slideUp.duration = 300
-        slideUp.interpolator = AccelerateDecelerateInterpolator()
-
-        fadeIn.start()
-        slideUp.start()
-        isAnimating = false
+        emptyContainer.translationY = 40f
+        emptyContainer.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(280)
+            .start()
     }
 }

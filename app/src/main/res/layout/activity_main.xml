@@ -1,35 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground">
+    android:background="?attr/colorSurface">
 
     <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fitsSystemWindows="true"
-        app:liftOnScroll="true">
+        android:background="?attr/colorSurface"
+        app:liftOnScroll="true"
+        app:liftOnScrollTargetViewId="@id/recyclerAlbums">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
+            style="@style/Widget.App.Toolbar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:title="@string/app_name"
-            app:titleTextAppearance="@style/TextAppearance.Material3.HeadlineMedium"
-            app:titleCentered="false">
+            android:minHeight="76dp"
+            android:background="?attr/colorSurface"
+            app:title="@string/albums"
+            app:titleTextColor="?attr/colorOnSurface">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnLayoutToggle"
-                style="@style/Widget.Material3.Button.TextButton"
+                style="@style/Widget.Material3.Button.IconButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:text="@string/list_view"
-                android:textSize="14sp"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="@string/grid_view"
                 app:icon="@drawable/ic_list"
-                app:iconSize="20dp" />
+                app:iconTint="?attr/colorOnSurfaceVariant" />
+
         </com.google.android.material.appbar.MaterialToolbar>
+
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.recyclerview.widget.RecyclerView
@@ -37,35 +44,57 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:padding="8dp"
+        android:paddingStart="10dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="104dp"
+        android:scrollbars="none"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <LinearLayout
+        android:id="@+id/emptyState"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="48dp"
+        android:paddingEnd="48dp"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <ImageView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:contentDescription="@string/empty_albums"
+            android:src="@drawable/ic_photo_library"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/empty_albums"
+            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+            android:textColor="?attr/colorOnSurface" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="@string/empty_albums_sub"
+            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+    </LinearLayout>
+
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/btnTrash"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="24dp"
-        android:orientation="horizontal">
+        android:layout_gravity="bottom|end"
+        android:layout_margin="20dp"
+        android:text="@string/trash"
+        app:icon="@drawable/ic_delete" />
 
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-            android:id="@+id/btnKeep"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
-            android:text="@string/keep"
-            app:icon="@drawable/ic_keep"
-            app:iconTint="?attr/colorOnPrimaryContainer"
-            android:textColor="?attr/colorOnPrimaryContainer"
-            app:backgroundTint="?attr/colorPrimaryContainer" />
-
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-            android:id="@+id/btnTrash"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/trash"
-            app:icon="@drawable/ic_delete"
-            app:iconTint="?attr/colorOnSecondaryContainer"
-            android:textColor="?attr/colorOnSecondaryContainer"
-            app:backgroundTint="?attr/colorSecondaryContainer" />
-    </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

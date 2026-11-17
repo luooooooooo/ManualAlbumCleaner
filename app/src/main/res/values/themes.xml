@@ -1,51 +1,97 @@
-<resources>
-    <!-- Main App Theme: Material 3 Day/Night -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 主主题：Material 3 日夜模式，Android 12+ 由动态取色覆盖 -->
     <style name="Theme.ManualAlbumCleaner" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/md_theme_primary</item>
-        <item name="colorOnPrimary">@color/md_theme_onPrimary</item>
-        <item name="colorPrimaryContainer">@color/md_theme_primaryContainer</item>
-        <item name="colorOnPrimaryContainer">@color/md_theme_onPrimaryContainer</item>
+        <item name="colorPrimary">@color/color_primary</item>
+        <item name="colorOnPrimary">@color/color_on_primary</item>
+        <item name="colorPrimaryContainer">@color/color_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/color_on_primary_container</item>
 
-        <item name="colorSecondary">@color/md_theme_secondary</item>
-        <item name="colorOnSecondary">@color/md_theme_onSecondary</item>
-        <item name="colorSecondaryContainer">@color/md_theme_secondaryContainer</item>
-        <item name="colorOnSecondaryContainer">@color/md_theme_onSecondaryContainer</item>
+        <item name="colorSecondary">@color/color_secondary</item>
+        <item name="colorOnSecondary">@color/color_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/color_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/color_on_secondary_container</item>
 
-        <item name="colorTertiary">@color/md_theme_tertiary</item>
-        <item name="colorOnTertiary">@color/md_theme_onTertiary</item>
-        <item name="colorTertiaryContainer">@color/md_theme_tertiaryContainer</item>
-        <item name="colorOnTertiaryContainer">@color/md_theme_onTertiaryContainer</item>
+        <item name="colorTertiary">@color/color_tertiary</item>
+        <item name="colorOnTertiary">@color/color_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/color_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/color_on_tertiary_container</item>
 
-        <item name="colorError">@color/md_theme_error</item>
-        <item name="colorOnError">@color/md_theme_onError</item>
-        <item name="colorErrorContainer">@color/md_theme_errorContainer</item>
-        <item name="colorOnErrorContainer">@color/md_theme_onErrorContainer</item>
+        <item name="colorError">@color/color_error</item>
+        <item name="colorOnError">@color/color_on_error</item>
+        <item name="colorErrorContainer">@color/color_error_container</item>
+        <item name="colorOnErrorContainer">@color/color_on_error_container</item>
 
-        <item name="android:colorBackground">@color/md_theme_background</item>
-        <item name="colorOnBackground">@color/md_theme_onBackground</item>
-        <item name="colorSurface">@color/md_theme_surface</item>
-        <item name="colorOnSurface">@color/md_theme_onSurface</item>
-        <item name="colorSurfaceVariant">@color/md_theme_surfaceVariant</item>
-        <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
-        <item name="colorOutline">@color/md_theme_outline</item>
+        <item name="android:colorBackground">@color/color_surface</item>
+        <item name="colorOnBackground">@color/color_on_surface</item>
+        <item name="colorSurface">@color/color_surface</item>
+        <item name="colorOnSurface">@color/color_on_surface</item>
+        <item name="colorSurfaceContainerLowest">@color/color_surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/color_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/color_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/color_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/color_surface_container_highest</item>
+        <item name="colorOnSurfaceVariant">@color/color_on_surface_variant</item>
+        <item name="colorOutline">@color/color_outline</item>
+        <item name="colorOutlineVariant">@color/color_outline_variant</item>
+        <item name="colorSurfaceInverse">@color/color_inverse_surface</item>
+        <item name="colorOnSurfaceInverse">@color/color_inverse_on_surface</item>
 
+        <item name="android:windowBackground">@color/color_surface</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
     </style>
 
-    <style name="TopRoundedCorner">
-        <item name="cornerFamily">rounded</item>
-        <item name="cornerSizeTopLeft">16dp</item>
-        <item name="cornerSizeTopRight">16dp</item>
-        <item name="cornerSizeBottomLeft">0dp</item>
-        <item name="cornerSizeBottomRight">0dp</item>
-    </style>
-
-    <!-- Photo Swipe Activity: Force dark immersive -->
-    <style name="Theme.ManualAlbumCleaner.PhotoSwipe" parent="Theme.Material3.Dark.NoActionBar">
+    <!-- 相册浏览页：全屏沉浸黑底 -->
+    <style name="Theme.ManualAlbumCleaner.Viewer" parent="Theme.Material3.Dark.NoActionBar">
         <item name="android:windowBackground">@color/photo_surface</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
     </style>
+
+    <!-- 相册卡片圆角 -->
+    <style name="ShapeAppearance.App.Card" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">20dp</item>
+    </style>
+
+    <style name="ShapeAppearance.App.Tile" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">14dp</item>
+    </style>
+
+    <!-- 卡片封面只圆上面两角，与卡片外轮廓对齐 -->
+    <style name="ShapeAppearance.App.CoverTop" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">20dp</item>
+        <item name="cornerSizeTopRight">20dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <!-- 圆形 -->
+    <style name="ShapeAppearance.App.Circle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- 底部操作条：只圆上面两角 -->
+    <style name="ShapeAppearance.App.BottomBar" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">24dp</item>
+        <item name="cornerSizeTopRight">24dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <style name="Widget.App.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="android:elevation">0dp</item>
+        <item name="titleTextAppearance">@style/TextAppearance.Material3.HeadlineSmall</item>
+        <item name="subtitleTextAppearance">@style/TextAppearance.Material3.BodyMedium</item>
+        <item name="subtitleTextColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
 </resources>

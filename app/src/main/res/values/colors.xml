@@ -1,51 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Material Design 3 Light Color Palette -->
-    <color name="md_theme_primary">#6750A4</color>
-    <color name="md_theme_onPrimary">#FFFFFF</color>
-    <color name="md_theme_primaryContainer">#EADDFF</color>
-    <color name="md_theme_onPrimaryContainer">#21005D</color>
+    <!-- 浅色兜底配色（Android 12 以下生效；Android 12+ 由系统壁纸动态取色覆盖） -->
+    <color name="color_primary">#2563EB</color>
+    <color name="color_on_primary">#FFFFFF</color>
+    <color name="color_primary_container">#DCE3FF</color>
+    <color name="color_on_primary_container">#001849</color>
 
-    <color name="md_theme_secondary">#625B71</color>
-    <color name="md_theme_onSecondary">#FFFFFF</color>
-    <color name="md_theme_secondaryContainer">#E8DEF8</color>
-    <color name="md_theme_onSecondaryContainer">#1D192B</color>
+    <color name="color_secondary">#5A5F70</color>
+    <color name="color_on_secondary">#FFFFFF</color>
+    <color name="color_secondary_container">#DFE2F4</color>
+    <color name="color_on_secondary_container">#171B2A</color>
 
-    <color name="md_theme_tertiary">#7D5260</color>
-    <color name="md_theme_onTertiary">#FFFFFF</color>
-    <color name="md_theme_tertiaryContainer">#FFD8E4</color>
-    <color name="md_theme_onTertiaryContainer">#31111D</color>
+    <color name="color_tertiary">#755781</color>
+    <color name="color_on_tertiary">#FFFFFF</color>
+    <color name="color_tertiary_container">#F6D9FF</color>
+    <color name="color_on_tertiary_container">#2C1139</color>
 
-    <color name="md_theme_error">#B3261E</color>
-    <color name="md_theme_onError">#FFFFFF</color>
-    <color name="md_theme_errorContainer">#F9DEDC</color>
-    <color name="md_theme_onErrorContainer">#410E0B</color>
+    <color name="color_error">#BA1A1A</color>
+    <color name="color_on_error">#FFFFFF</color>
+    <color name="color_error_container">#FFDAD6</color>
+    <color name="color_on_error_container">#410002</color>
 
-    <color name="md_theme_surface">#FFFBFE</color>
-    <color name="md_theme_onSurface">#1C1B1F</color>
-    <color name="md_theme_surfaceVariant">#E7E0EC</color>
-    <color name="md_theme_onSurfaceVariant">#49454F</color>
-    <color name="md_theme_outline">#79747E</color>
-    <color name="md_theme_outlineVariant">#CAC4D0</color>
+    <color name="color_surface">#FAF9FE</color>
+    <color name="color_on_surface">#1A1B21</color>
+    <color name="color_surface_container_lowest">#FFFFFF</color>
+    <color name="color_surface_container_low">#F4F3FA</color>
+    <color name="color_surface_container">#EEEDF4</color>
+    <color name="color_surface_container_high">#E8E7EF</color>
+    <color name="color_surface_container_highest">#E2E1E9</color>
+    <color name="color_on_surface_variant">#46464F</color>
+    <color name="color_outline">#777680</color>
+    <color name="color_outline_variant">#C7C5D0</color>
+    <color name="color_inverse_surface">#2F3037</color>
+    <color name="color_inverse_on_surface">#F1F0F7</color>
 
-    <color name="md_theme_background">#FFFBFE</color>
-    <color name="md_theme_onBackground">#1C1B1F</color>
+    <!-- 看图页专用（始终深色） -->
+    <color name="photo_surface">#000000</color>
+    <color name="photo_on_surface">#ECECEC</color>
+    <color name="photo_on_surface_variant">#A8A8B0</color>
+    <color name="photo_scrim_top">#99000000</color>
+    <color name="photo_scrim_bottom">#B3000000</color>
 
-    <!-- Photo Viewer Dark Surface -->
-    <color name="photo_surface">#1C1B1F</color>
-    <color name="photo_surface_variant">#49454F</color>
-    <color name="photo_on_surface">#E6E1E5</color>
-    <color name="photo_on_surface_variant">#CAC4D0</color>
-
-    <!-- Action Colors (M3 expressive) -->
-    <color name="action_keep">#2E7D32</color>
-    <color name="action_keep_container">#C8E6C9</color>
-    <color name="action_delete">#C62828</color>
-    <color name="action_delete_container">#FFCDD2</color>
-
-    <!-- Common -->
-    <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
     <color name="transparent">#00000000</color>
-    <color name="scrim">#99000000</color>
 </resources>

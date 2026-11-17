@@ -7,63 +7,96 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.widget.LinearLayout
 import android.widget.Toast
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var appBar: AppBarLayout
+    private lateinit var toolbar: MaterialToolbar
     private lateinit var recyclerAlbums: RecyclerView
+    private lateinit var emptyState: LinearLayout
     private lateinit var btnTrash: ExtendedFloatingActionButton
-    private lateinit var btnKeep: ExtendedFloatingActionButton
     private lateinit var btnLayoutToggle: MaterialButton
-    private val REQUEST_PERMISSION = 1001
+    private lateinit var adapter: AlbumAdapter
+    private lateinit var trashManager: TrashManager
+
+    private var albumList: List<AlbumInfo> = emptyList()
     private var isGridView = true
 
+    private val REQUEST_PERMISSION = 1001
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        appBar = findViewById(R.id.appBar)
+        toolbar = findViewById(R.id.toolbar)
         recyclerAlbums = findViewById(R.id.recyclerAlbums)
+        emptyState = findViewById(R.id.emptyState)
         btnTrash = findViewById(R.id.btnTrash)
-        btnKeep = findViewById(R.id.btnKeep)
         btnLayoutToggle = findViewById(R.id.btnLayoutToggle)
+        trashManager = TrashManager(this)
 
         recyclerAlbums.layoutManager = GridLayoutManager(this, 2)
+        adapter = AlbumAdapter(emptyList(), isGridView) { album ->
+            val intent = Intent(this, PhotoSwipeActivity::class.java)
+            intent.putExtra("bucketId", album.bucketId)
+            intent.putExtra("bucketName", album.bucketName)
+            startActivity(intent)
+        }
+        recyclerAlbums.adapter = adapter
 
         btnTrash.setOnClickListener {
             startActivity(Intent(this, TrashActivity::class.java))
         }
+        btnLayoutToggle.setOnClickListener { toggleLayout() }
 
-        btnKeep.setOnClickListener {
-            startActivity(Intent(this, KeepActivity::class.java))
-        }
-
-        btnLayoutToggle.setOnClickListener {
-            toggleLayout()
-        }
-
+        applyWindowInsets()
         checkPermissionAndLoad()
+    }
+
+    private fun applyWindowInsets() {
+        val baseRecyclerBottom = recyclerAlbums.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.rootLayout)) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            appBar.updatePadding(top = bars.top)
+            recyclerAlbums.updatePadding(bottom = baseRecyclerBottom + bars.bottom)
+            btnTrash.translationY = -bars.bottom.toFloat()
+            emptyState.updatePadding(bottom = bars.bottom)
+            insets
+        }
     }
 
     private fun toggleLayout() {
         isGridView = !isGridView
         if (isGridView) {
             recyclerAlbums.layoutManager = GridLayoutManager(this, 2)
-            btnLayoutToggle.text = getString(R.string.list_view)
             btnLayoutToggle.setIconResource(R.drawable.ic_list)
+            btnLayoutToggle.contentDescription = getString(R.string.grid_view)
         } else {
             recyclerAlbums.layoutManager = LinearLayoutManager(this)
-            btnLayoutToggle.text = getString(R.string.grid_view)
             btnLayoutToggle.setIconResource(R.drawable.ic_grid)
+            btnLayoutToggle.contentDescription = getString(R.string.list_view)
         }
-        loadAlbums()
+        adapter.setData(albumList, isGridView)
+        recyclerAlbums.scrollToPosition(0)
     }
 
     override fun onResume() {
@@ -145,12 +178,28 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val albumList = albums.values.toList()
-        recyclerAlbums.adapter = AlbumAdapter(albumList, isGridView) { album ->
-            val intent = Intent(this, PhotoSwipeActivity::class.java)
-            intent.putExtra("bucketId", album.bucketId)
-            intent.putExtra("bucketName", album.bucketName)
-            startActivity(intent)
+        albumList = albums.values.toList()
+        adapter.setData(albumList, isGridView)
+        recyclerAlbums.isVisible = albumList.isNotEmpty()
+        emptyState.isVisible = albumList.isEmpty()
+        updateHeader()
+        updateTrashButton()
+    }
+
+    private fun updateHeader() {
+        toolbar.subtitle = if (albumList.isEmpty()) {
+            null
+        } else {
+            getString(R.string.album_count, albumList.size)
+        }
+    }
+
+    private fun updateTrashButton() {
+        val count = trashManager.getTrashList().size
+        btnTrash.text = if (count > 0) {
+            getString(R.string.trash_count_short, count)
+        } else {
+            getString(R.string.trash)
         }
     }
 

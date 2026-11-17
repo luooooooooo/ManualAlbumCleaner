@@ -1,24 +1,36 @@
 <resources>
     <string name="app_name">手动相册清理</string>
-    <string name="select_album">选择相册</string>
-    <string name="trash">回收站</string>
-    <string name="no_photos">没有照片</string>
-    <string name="swipe_left_keep">← 左滑保留</string>
-    <string name="swipe_right_delete">右滑删除 →</string>
-    <string name="all_done">全部处理完毕</string>
-    <string name="all_done_subtitle">所有照片已整理完成</string>
-    <string name="empty_trash">清空回收站</string>
-    <string name="delete_permanently">彻底删除</string>
-    <string name="restore">恢复</string>
-    <string name="photo_count">%1$d 张照片</string>
-    <string name="list_view">列表</string>
+
+    <!-- 主界面 -->
+    <string name="albums">相册</string>
+    <string name="album_count">%1$d 个相册</string>
     <string name="grid_view">网格</string>
-    <string name="keep">保留站</string>
-    <string name="clear_keep">清空保留站</string>
+    <string name="list_view">列表</string>
+    <string name="empty_albums">没有找到照片</string>
+    <string name="empty_albums_sub">相册中有照片后才能开始整理</string>
+
+    <!-- 回收站 -->
+    <string name="trash">回收站</string>
+    <string name="trash_count_short">回收站 · %1$d</string>
+    <string name="empty_trash">回收站是空的</string>
+    <string name="empty_trash_sub">上滑删除的照片会先放在这里</string>
     <string name="select">选择</string>
     <string name="select_all">全选</string>
-    <string name="tap_to_select">点击照片进行选择</string>
-    <string name="delete_selected">删除选中</string>
-    <string name="restore_selected">恢复选中</string>
+    <string name="cancel">取消</string>
     <string name="selected_count">已选择 %1$d 张</string>
+    <string name="tap_to_select">点击照片进行选择</string>
+    <string name="restore_selected">恢复</string>
+    <string name="delete_selected">彻底删除</string>
+    <string name="photo_count">%1$d 张</string>
+
+    <!-- 看图页 -->
+    <string name="all_done">全部处理完毕</string>
+    <string name="all_done_subtitle">这个相册已经整理完了</string>
+    <string name="back_to_albums">返回相册</string>
+    <string name="open_trash">查看回收站</string>
+    <string name="viewer_hint">左右滑动浏览 · 上滑移入回收站</string>
+    <string name="trash_target">移入回收站</string>
+    <string name="page_indicator">%1$d / %2$d</string>
+    <string name="moved_to_trash">已移入回收站</string>
+    <string name="load_failed">照片加载失败</string>
 </resources>
