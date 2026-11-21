@@ -9,6 +9,10 @@ class TrashManager(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("trash_prefs", Context.MODE_PRIVATE)
 
+    /** 回收站 id 的内存缓存：避免每张照片都重新解析一遍整份 JSON */
+    @Volatile
+    private var cachedIds: Set<Long>? = null
+
     fun addToTrash(photo: PhotoItem) {
         val list = getTrashList().toMutableList()
         if (list.none { it.id == photo.id }) {
@@ -47,10 +51,19 @@ class TrashManager(context: Context) {
     }
 
     fun isInTrash(photoId: Long): Boolean {
-        return getTrashList().any { it.id == photoId }
+        return photoId in getTrashIds()
+    }
+
+    /** 一次性拿到回收站里的全部照片 id，批量过滤用 */
+    fun getTrashIds(): Set<Long> {
+        cachedIds?.let { return it }
+        val ids = getTrashList().mapTo(HashSet()) { it.id }
+        cachedIds = ids
+        return ids
     }
 
     private fun saveList(list: List<PhotoItem>) {
+        cachedIds = null
         val array = JSONArray()
         for (item in list) {
             val obj = org.json.JSONObject()

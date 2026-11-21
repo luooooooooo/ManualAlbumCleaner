@@ -67,6 +67,15 @@
 
         </LinearLayout>
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPickStart"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/pick_start_photo"
+            app:icon="@drawable/ic_photo_library"
+            app:iconTint="@color/photo_on_surface" />
+
     </LinearLayout>
 
     <!-- 上滑时的回收站目标 -->

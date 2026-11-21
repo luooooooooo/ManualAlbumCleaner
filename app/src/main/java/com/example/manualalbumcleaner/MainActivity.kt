@@ -10,6 +10,7 @@ import android.provider.MediaStore
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -45,6 +46,22 @@ class MainActivity : AppCompatActivity() {
 
     private val REQUEST_PERMISSION = 1001
 
+    /** 点击相册后先进入缩略图选择页，由它返回用户点选的起始照片 */
+    private var pendingAlbum: AlbumInfo? = null
+
+    private val pickStartLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val album = pendingAlbum ?: return@registerForActivityResult
+            if (result.resultCode != RESULT_OK) return@registerForActivityResult
+            val data = result.data ?: return@registerForActivityResult
+            val intent = Intent(this, PhotoSwipeActivity::class.java)
+            intent.putExtra("bucketId", album.bucketId)
+            intent.putExtra("bucketName", album.bucketName)
+            intent.putExtra("startPhotoId", data.getLongExtra("startPhotoId", -1L))
+            intent.putExtra("startPosition", data.getIntExtra("startPosition", 0))
+            startActivity(intent)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -70,10 +87,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         adapter = AlbumAdapter(emptyList(), isGridView, gridColumns) { album ->
-            val intent = Intent(this, PhotoSwipeActivity::class.java)
+            pendingAlbum = album
+            val intent = Intent(this, PhotoPickerActivity::class.java)
             intent.putExtra("bucketId", album.bucketId)
             intent.putExtra("bucketName", album.bucketName)
-            startActivity(intent)
+            pickStartLauncher.launch(intent)
         }
         recyclerAlbums.adapter = adapter
 

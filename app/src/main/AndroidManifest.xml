@@ -29,6 +29,9 @@
         <activity
             android:name=".PhotoSwipeActivity"
             android:theme="@style/Theme.ManualAlbumCleaner.Viewer" />
+        <activity
+            android:name=".PhotoPickerActivity"
+            android:theme="@style/Theme.ManualAlbumCleaner" />
         <activity android:name=".TrashActivity" />
     </application>
 

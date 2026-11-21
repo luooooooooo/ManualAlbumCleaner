@@ -3,12 +3,12 @@ package com.example.manualalbumcleaner
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.provider.MediaStore
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -37,6 +37,19 @@ class PhotoSwipeActivity : AppCompatActivity() {
 
     private val photos = mutableListOf<PhotoItem>()
 
+    private var bucketId: String = ""
+    private var albumName: String = ""
+
+    /** 从「选择起始照片」页拿到用户点选的那张，直接跳过去 */
+    private val pickStartLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode != RESULT_OK) return@registerForActivityResult
+            val data = result.data ?: return@registerForActivityResult
+            val photoId = data.getLongExtra("startPhotoId", -1L)
+            val fallbackPosition = data.getIntExtra("startPosition", 0)
+            jumpTo(photoId, fallbackPosition)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
@@ -55,7 +68,7 @@ class PhotoSwipeActivity : AppCompatActivity() {
         bottomBar = findViewById(R.id.bottomBar)
         emptyContainer = findViewById(R.id.emptyContainer)
 
-        val albumName = intent.getStringExtra("bucketName").orEmpty()
+        albumName = intent.getStringExtra("bucketName").orEmpty()
         tvAlbumName.text = albumName
 
         findViewById<MaterialButton>(R.id.btnBack).setOnClickListener { finish() }
@@ -63,21 +76,40 @@ class PhotoSwipeActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.btnOpenTrash).setOnClickListener {
             startActivity(Intent(this, TrashActivity::class.java))
         }
+        findViewById<MaterialButton>(R.id.btnPickStart).setOnClickListener { openStartPicker() }
 
         applyWindowInsets()
 
-        val bucketId = intent.getStringExtra("bucketId") ?: return
+        bucketId = intent.getStringExtra("bucketId") ?: return
         loadPhotos(bucketId)
 
         setUpPager()
         setUpSwipeGesture()
 
+        val startPhotoId = intent.getLongExtra("startPhotoId", -1L)
+        val startPosition = intent.getIntExtra("startPosition", 0)
         if (photos.isEmpty()) {
             showEmptyState()
         } else {
-            updateIndicator()
+            jumpTo(startPhotoId, startPosition)
             animateContentIn()
         }
+    }
+
+    private fun openStartPicker() {
+        val intent = Intent(this, PhotoPickerActivity::class.java)
+        intent.putExtra("bucketId", bucketId)
+        intent.putExtra("bucketName", albumName)
+        pickStartLauncher.launch(intent)
+    }
+
+    /** photoId 优先；找不到（已被删/被移走）时退回列表位置兜底 */
+    private fun jumpTo(photoId: Long, fallbackPosition: Int) {
+        if (photos.isEmpty()) return
+        val index = if (photoId > 0) photos.indexOfFirst { it.id == photoId } else -1
+        val target = if (index >= 0) index else fallbackPosition.coerceIn(0, photos.lastIndex)
+        pager.setCurrentItem(target, false)
+        updateIndicator()
     }
 
     private fun applyWindowInsets() {
@@ -93,42 +125,8 @@ class PhotoSwipeActivity : AppCompatActivity() {
     }
 
     private fun loadPhotos(bucketId: String) {
-        val projection = arrayOf(
-            MediaStore.Images.Media._ID,
-            MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.BUCKET_ID,
-            MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
-            volumeColumnName()
-        ).filterNotNull().toTypedArray()
-        val selection = "${MediaStore.Images.Media.BUCKET_ID} = ?"
-        val selectionArgs = arrayOf(bucketId)
-
-        contentResolver.query(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            selection,
-            selectionArgs,
-            "${MediaStore.Images.Media.DATE_ADDED} DESC"
-        )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-            val bucketIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
-            val bucketNameColumn =
-                cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
-            val volumeColumn = cursor.getColumnIndex(volumeColumnName() ?: "")
-
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val name = cursor.getString(nameColumn) ?: ""
-                val bId = cursor.getString(bucketIdColumn) ?: ""
-                val bName = cursor.getString(bucketNameColumn) ?: ""
-                val volume = if (volumeColumn >= 0) cursor.getString(volumeColumn) else null
-                // 已在回收站里的照片不再出现在浏览队列中
-                if (!trashManager.isInTrash(id)) {
-                    photos.add(PhotoItem(id, imageUriOf(id, volume), name, bId, bName))
-                }
-            }
-        }
+        photos.clear()
+        photos.addAll(AlbumPhotoLoader.load(contentResolver, bucketId, trashManager.getTrashIds()))
     }
 
     private fun setUpPager() {
