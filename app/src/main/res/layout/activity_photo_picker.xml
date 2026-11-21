@@ -66,6 +66,59 @@
 
     </LinearLayout>
 
+    <!-- 筛选与排序 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/filterChips"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            app:selectionRequired="true"
+            app:singleLine="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipAll"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/filter_all" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipJpg"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/filter_jpg" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipRaw"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/filter_raw" />
+
+        </com.google.android.material.chip.ChipGroup>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSort"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/sort_newest"
+            android:textColor="?attr/colorOnSurface" />
+
+    </LinearLayout>
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -88,6 +141,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
+
+        <com.example.manualalbumcleaner.widget.FastScrollDateBar
+            android:id="@+id/dateBar"
+            android:layout_width="132dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp" />
 
         <LinearLayout
             android:id="@+id/emptyContainer"

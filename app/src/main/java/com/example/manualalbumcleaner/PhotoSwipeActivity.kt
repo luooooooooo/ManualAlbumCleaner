@@ -39,6 +39,8 @@ class PhotoSwipeActivity : AppCompatActivity() {
 
     private var bucketId: String = ""
     private var albumName: String = ""
+    private var filter: PhotoFilter = PhotoFilter.ALL
+    private var sort: SortOrder = SortOrder.NEWEST_FIRST
 
     /** 从「选择起始照片」页拿到用户点选的那张，直接跳过去 */
     private val pickStartLauncher =
@@ -47,6 +49,13 @@ class PhotoSwipeActivity : AppCompatActivity() {
             val data = result.data ?: return@registerForActivityResult
             val photoId = data.getLongExtra("startPhotoId", -1L)
             val fallbackPosition = data.getIntExtra("startPosition", 0)
+            val newFilter = parseFilter(data.getStringExtra("photoFilter"))
+            val newSort = parseSort(data.getStringExtra("sortOrder"))
+            if (newFilter != filter || newSort != sort) {
+                filter = newFilter
+                sort = newSort
+                reloadPhotos()
+            }
             jumpTo(photoId, fallbackPosition)
         }
 
@@ -81,6 +90,8 @@ class PhotoSwipeActivity : AppCompatActivity() {
         applyWindowInsets()
 
         bucketId = intent.getStringExtra("bucketId") ?: return
+        filter = parseFilter(intent.getStringExtra("photoFilter"))
+        sort = parseSort(intent.getStringExtra("sortOrder"))
         loadPhotos(bucketId)
 
         setUpPager()
@@ -100,8 +111,16 @@ class PhotoSwipeActivity : AppCompatActivity() {
         val intent = Intent(this, PhotoPickerActivity::class.java)
         intent.putExtra("bucketId", bucketId)
         intent.putExtra("bucketName", albumName)
+        intent.putExtra("photoFilter", filter.name)
+        intent.putExtra("sortOrder", sort.name)
         pickStartLauncher.launch(intent)
     }
+
+    private fun parseFilter(value: String?): PhotoFilter =
+        runCatching { PhotoFilter.valueOf(value ?: "") }.getOrDefault(PhotoFilter.ALL)
+
+    private fun parseSort(value: String?): SortOrder =
+        runCatching { SortOrder.valueOf(value ?: "") }.getOrDefault(SortOrder.NEWEST_FIRST)
 
     /** photoId 优先；找不到（已被删/被移走）时退回列表位置兜底 */
     private fun jumpTo(photoId: Long, fallbackPosition: Int) {
@@ -126,7 +145,24 @@ class PhotoSwipeActivity : AppCompatActivity() {
 
     private fun loadPhotos(bucketId: String) {
         photos.clear()
-        photos.addAll(AlbumPhotoLoader.load(contentResolver, bucketId, trashManager.getTrashIds()))
+        photos.addAll(
+            AlbumPhotoLoader.load(contentResolver, bucketId, trashManager.getTrashIds(), filter, sort)
+        )
+    }
+
+    /** 在浏览页里换了筛选 / 排序后，重新查询并提示空状态 */
+    private fun reloadPhotos() {
+        loadPhotos(bucketId)
+        adapter.notifyDataSetChanged()
+        swipeLayout.dragEnabled = photos.isNotEmpty()
+        if (photos.isEmpty()) {
+            showEmptyState()
+            return
+        }
+        pager.visibility = View.VISIBLE
+        bottomBar.visibility = View.VISIBLE
+        tvPageIndicator.visibility = View.VISIBLE
+        emptyContainer.visibility = View.GONE
     }
 
     private fun setUpPager() {
