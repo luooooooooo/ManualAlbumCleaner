@@ -59,6 +59,8 @@ class MainActivity : AppCompatActivity() {
             intent.putExtra("bucketName", album.bucketName)
             intent.putExtra("startPhotoId", data.getLongExtra("startPhotoId", -1L))
             intent.putExtra("startPosition", data.getIntExtra("startPosition", 0))
+            intent.putExtra("photoFilter", data.getStringExtra("photoFilter"))
+            intent.putExtra("sortOrder", data.getStringExtra("sortOrder"))
             startActivity(intent)
         }
 

@@ -33,6 +33,7 @@ class PhotoPickerActivity : AppCompatActivity() {
     private lateinit var progress: ProgressBar
     private lateinit var emptyContainer: LinearLayout
     private lateinit var tvAlbumName: TextView
+    private lateinit var tvEmptyText: TextView
     private lateinit var tvPickerHint: TextView
     private lateinit var filterChips: ChipGroup
     private lateinit var btnSort: MaterialButton
@@ -68,6 +69,7 @@ class PhotoPickerActivity : AppCompatActivity() {
         progress = findViewById(R.id.progress)
         emptyContainer = findViewById(R.id.emptyContainer)
         tvAlbumName = findViewById(R.id.tvAlbumName)
+        tvEmptyText = findViewById(R.id.tvEmptyText)
         tvPickerHint = findViewById(R.id.tvPickerHint)
         filterChips = findViewById(R.id.filterChips)
         btnSort = findViewById(R.id.btnSort)
@@ -184,9 +186,12 @@ class PhotoPickerActivity : AppCompatActivity() {
         if (photos.isEmpty()) {
             grid.visibility = View.GONE
             emptyContainer.visibility = View.VISIBLE
-            tvPickerHint.text = getString(
+            val emptyText = getString(
                 if (filter == PhotoFilter.ALL) R.string.no_photos_in_album else R.string.filter_empty
             )
+            tvEmptyText.text = emptyText
+            tvPickerHint.text = emptyText
+            dateBar.refresh()
             return
         }
 
